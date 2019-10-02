@@ -371,6 +371,10 @@ EXPORT_SYMBOL void mnl_nlmsg_fprintf(FILE *fd, const void *data, size_t datalen,
 }
 
 /**
+ * @}
+ */
+
+/**
  * \defgroup batch Netlink message batch helpers
  *
  * This library provides helpers to batch several messages into one single
