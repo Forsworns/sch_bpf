@@ -59,7 +59,7 @@
  *
  * \section scm Git Tree
  * The current development version of libmnl can be accessed at:
- * http://git.netfilter.org/cgi-bin/gitweb.cgi?p=libmnl.git;a=summary
+ * https://git.netfilter.org/libmnl/
  *
  * \section using Using libmnl
  * You can access several example files under examples/ in the libmnl source
