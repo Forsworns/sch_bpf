@@ -43,8 +43,11 @@ AS_IF([test "x$with_doxygen" != xno], [
 
 AM_CONDITIONAL([HAVE_DOXYGEN], [test -n "$DOXYGEN"])
 AS_IF([test "x$DOXYGEN" = x], [
-	dnl Only run doxygen Makefile if doxygen installed
-	AC_MSG_WARN([Doxygen not found - continuing without Doxygen support])
+	AS_IF([test "x$with_doxygen" != xno], [
+		dnl Only run doxygen Makefile if doxygen installed
+		AC_MSG_WARN([Doxygen not found - continuing without Doxygen support])
+		with_doxygen=no
+	])
 ])
 AC_OUTPUT
 
