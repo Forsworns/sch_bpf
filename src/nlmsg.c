@@ -381,15 +381,16 @@ EXPORT_SYMBOL void mnl_nlmsg_fprintf(FILE *fd, const void *data, size_t datalen,
  * datagram. These helpers do not perform strict memory boundary checkings.
  *
  * The following figure represents a Netlink message batch:
- *
- *   |<-------------- MNL_SOCKET_BUFFER_SIZE ------------->|
- *   |<-------------------- batch ------------------>|     |
- *   |-----------|-----------|-----------|-----------|-----------|
- *   |<- nlmsg ->|<- nlmsg ->|<- nlmsg ->|<- nlmsg ->|<- nlmsg ->|
- *   |-----------|-----------|-----------|-----------|-----------|
- *                                             ^           ^
- *                                             |           |
- *                                        message N   message N+1
+ *\verbatim
+   |<-------------- MNL_SOCKET_BUFFER_SIZE ------------->|
+   |<-------------------- batch ------------------>|     |
+   |-----------|-----------|-----------|-----------|-----------|
+   |<- nlmsg ->|<- nlmsg ->|<- nlmsg ->|<- nlmsg ->|<- nlmsg ->|
+   |-----------|-----------|-----------|-----------|-----------|
+					     ^           ^
+					     |           |
+					message N   message N+1
+\endverbatim
  *
  * To start the batch, you have to call mnl_nlmsg_batch_start() and you can
  * use mnl_nlmsg_batch_stop() to release it.
