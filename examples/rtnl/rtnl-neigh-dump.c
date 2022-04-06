@@ -103,7 +103,7 @@ int main(int argc, char *argv[])
 	unsigned int seq, portid;
 	struct mnl_socket *nl;
 	struct nlmsghdr *nlh;
-	struct rtgenmsg *rt;
+	struct ndmsg *nd;
 	int ret;
 
 	if (argc != 2) {
@@ -116,11 +116,11 @@ int main(int argc, char *argv[])
 	nlh->nlmsg_flags = NLM_F_REQUEST | NLM_F_DUMP;
 	nlh->nlmsg_seq = seq = time(NULL);
 
-	rt = mnl_nlmsg_put_extra_header(nlh, sizeof(struct rtgenmsg));
+	nd = mnl_nlmsg_put_extra_header(nlh, sizeof(struct ndmsg));
 	if (strcmp(argv[1], "inet") == 0)
-		rt->rtgen_family = AF_INET;
+		nd->ndm_family = AF_INET;
 	else if (strcmp(argv[1], "inet6") == 0)
-		rt->rtgen_family = AF_INET6;
+		nd->ndm_family = AF_INET6;
 
 	nl = mnl_socket_open(NETLINK_ROUTE);
 	if (nl == NULL) {
