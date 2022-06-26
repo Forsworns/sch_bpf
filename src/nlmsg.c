@@ -12,6 +12,7 @@
 #include <ctype.h>
 #include <errno.h>
 #include <string.h>
+#include <unistd.h>
 #include <libmnl/libmnl.h>
 #include "internal.h"
 
@@ -244,11 +245,57 @@ static void mnl_nlmsg_fprintf_header(FILE *fd, const struct nlmsghdr *nlh)
 	fprintf(fd, "----------------\t------------------\n");
 }
 
+static void mnl_fprintf_attr_color(FILE *fd, const struct nlattr *attr)
+{
+	fprintf(fd, "|%c[%d;%dm"
+		    "%.5u"
+		    "%c[%dm"
+		    "|"
+		    "%c[%d;%dm"
+		    "%c%c"
+		    "%c[%dm"
+		    "|"
+		    "%c[%d;%dm"
+		    "%.5u"
+		    "%c[%dm|\t",
+		    27, 1, 31,
+		    attr->nla_len,
+		    27, 0,
+		    27, 1, 32,
+		    attr->nla_type & NLA_F_NESTED ? 'N' : '-',
+		    attr->nla_type & NLA_F_NET_BYTEORDER ? 'B' : '-',
+		    27, 0,
+		    27, 1, 34,
+		    attr->nla_type & NLA_TYPE_MASK,
+		    27, 0);
+}
+
+static void mnl_fprintf_attr_raw(FILE *fd, const struct nlattr *attr)
+{
+	fprintf(fd, "|"
+		    "%.5u"
+		    "|"
+		    "%c%c"
+		    "|"
+		    "%.5u"
+		    "|\t",
+		    attr->nla_len,
+		    attr->nla_type & NLA_F_NESTED ? 'N' : '-',
+		    attr->nla_type & NLA_F_NET_BYTEORDER ? 'B' : '-',
+		    attr->nla_type & NLA_TYPE_MASK);
+}
+
 static void mnl_nlmsg_fprintf_payload(FILE *fd, const struct nlmsghdr *nlh,
 				      size_t extra_header_size)
 {
-	int rem = 0;
+	int colorize = 0;
 	unsigned int i;
+	int rem = 0;
+	int fdnum;
+
+	fdnum = fileno(fd);
+	if (fdnum != -1)
+		colorize = isatty(fdnum);
 
 	for (i=sizeof(struct nlmsghdr); i<nlh->nlmsg_len; i+=4) {
 		char *b = (char *) nlh;
@@ -269,28 +316,11 @@ static void mnl_nlmsg_fprintf_payload(FILE *fd, const struct nlmsghdr *nlh,
 			fprintf(fd, "|  extra header  |\n");
 		/* this seems like an attribute header. */
 		} else if (rem == 0 && (attr->nla_type & NLA_TYPE_MASK) != 0) {
-			fprintf(fd, "|%c[%d;%dm"
-				    "%.5u"
-				    "%c[%dm"
-				    "|"
-				    "%c[%d;%dm"
-				    "%c%c"
-				    "%c[%dm"
-				    "|"
-				    "%c[%d;%dm"
-				    "%.5u"
-				    "%c[%dm|\t",
-				27, 1, 31,
-				attr->nla_len,
-				27, 0,
-				27, 1, 32,
-				attr->nla_type & NLA_F_NESTED ? 'N' : '-',
-				attr->nla_type &
-					NLA_F_NET_BYTEORDER ? 'B' : '-',
-				27, 0,
-				27, 1, 34,
-				attr->nla_type & NLA_TYPE_MASK,
-				27, 0);
+			if (colorize) {
+				mnl_fprintf_attr_color(fd, attr);
+			} else {
+				mnl_fprintf_attr_raw(fd, attr);
+			}
 			fprintf(fd, "|len |flags| type|\n");
 
 			if (!(attr->nla_type & NLA_F_NESTED)) {
