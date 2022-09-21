@@ -120,7 +120,7 @@ static int sch_bpf_enqueue(struct sk_buff *skb, struct Qdisc *sch,
 
 	enqueue = rcu_dereference(q->enqueue_prog.prog);
 	bpf_compute_data_pointers(skb);
-	ctx.skb = (struct __sk_buff *)skb;
+	ctx.skb = skb;
 	ctx.classid = sch->handle;
 	res = bpf_prog_run(enqueue, &ctx);
 	switch (res) {
@@ -177,7 +177,7 @@ static struct sk_buff *sch_bpf_dequeue(struct Qdisc *sch)
 	res = bpf_prog_run(dequeue, &ctx);
 	switch (res) {
 	case SCH_BPF_DEQUEUED:
-		ret = (struct sk_buff *)ctx.skb;
+		ret = ctx.skb;
 		break;
 	case SCH_BPF_THROTTLE:
 		now = ktime_get_ns();
@@ -196,7 +196,7 @@ static struct sk_buff *sch_bpf_dequeue(struct Qdisc *sch)
 			sch->q.qlen--;
 		}
 	}
-
+	
 	return ret;
 }
 

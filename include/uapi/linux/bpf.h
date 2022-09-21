@@ -6882,7 +6882,7 @@ struct bpf_core_relo {
 };
 
 struct sch_bpf_ctx {
-	struct __sk_buff *skb;
+	__bpf_md_ptr(struct sk_buff *, skb);
 	__u32 classid;
 	__u64 delay;
 };
