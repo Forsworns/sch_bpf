@@ -196,7 +196,11 @@ static struct sk_buff *sch_bpf_dequeue(struct Qdisc *sch)
 			sch->q.qlen--;
 		}
 	}
-	
+
+	if(ret){
+		skb_mark_not_on_list(ret);
+		ret->dev = qdisc_dev(sch);
+	}
 	return ret;
 }
 
