@@ -79,7 +79,7 @@ struct bpf_insn {
 /* Key of an a BPF_MAP_TYPE_LPM_TRIE entry */
 struct bpf_lpm_trie_key {
 	__u32	prefixlen;	/* up to 32 for AF_INET, 128 for AF_INET6 */
-	__u8	data[0];	/* Arbitrary size */
+	__u8	data[];	/* Arbitrary size */
 };
 
 struct bpf_cgroup_storage_key {
@@ -909,6 +909,8 @@ enum bpf_map_type {
 	BPF_MAP_TYPE_INODE_STORAGE,
 	BPF_MAP_TYPE_TASK_STORAGE,
 	BPF_MAP_TYPE_BLOOM_FILTER,
+	BPF_MAP_TYPE_SKBMAP,
+	BPF_MAP_TYPE_FLOWMAP,
 };
 
 /* Note that tracing related programs such as
@@ -952,6 +954,7 @@ enum bpf_prog_type {
 	BPF_PROG_TYPE_LSM,
 	BPF_PROG_TYPE_SK_LOOKUP,
 	BPF_PROG_TYPE_SYSCALL, /* a program that can execute syscalls */
+	BPF_PROG_TYPE_SCHED_QDISC,
 };
 
 enum bpf_attach_type {
@@ -5566,6 +5569,11 @@ union bpf_attr {
 	FN(tcp_raw_check_syncookie_ipv4),	\
 	FN(tcp_raw_check_syncookie_ipv6),	\
 	FN(ktime_get_tai_ns),		\
+	FN(skb_map_push),		\
+	FN(skb_map_pop),		\
+	FN(flow_map_push),		\
+	FN(flow_map_pop),		\
+	FN(skb_tc_classify),		\
 	/* */
 
 /* integer value in 'imm' field of BPF_CALL instruction selects which helper
@@ -6871,6 +6879,21 @@ struct bpf_core_relo {
 	__u32 type_id;
 	__u32 access_str_off;
 	enum bpf_core_relo_kind kind;
+};
+
+struct sch_bpf_ctx {
+	__bpf_md_ptr(struct sk_buff *, skb);
+	__u32 classid;
+	__u64 delay;
+};
+
+enum {
+	SCH_BPF_QUEUED,
+	SCH_BPF_DEQUEUED = SCH_BPF_QUEUED,
+	SCH_BPF_DROP,
+	SCH_BPF_CN,
+	SCH_BPF_THROTTLE,
+	SCH_BPF_PASS,
 };
 
 #endif /* _UAPI__LINUX_BPF_H__ */

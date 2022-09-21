@@ -42,6 +42,7 @@ struct mptcp_sock;
 struct bpf_dynptr;
 struct iphdr;
 struct ipv6hdr;
+struct sch_bpf_ctx;
 
 /*
  * bpf_map_lookup_elem
@@ -4606,4 +4607,12 @@ static long (*bpf_tcp_raw_check_syncookie_ipv6)(struct ipv6hdr *iph, struct tcph
  */
 static __u64 (*bpf_ktime_get_tai_ns)(void) = (void *) 208;
 
+static __u64 (*bpf_skb_map_push)(void *map, struct sk_buff *skb, __u32 key) = (void *) 209;
 
+static __u64 (*bpf_skb_map_pop)(void *map, __u32 key) = (void *) 210;
+
+static __u64 (*bpf_flow_map_push)(void *map, void *value, __u32 key) = (void *) 211;
+
+static __u64 (*bpf_flow_map_pop)(void *map, __u32 key) = (void *) 212;
+
+static __u64 (*bpf_skb_tc_classify)(struct __sk_buff *skb, int ifindex, __u32 handle) = (void *) 213;

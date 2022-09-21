@@ -8551,6 +8551,10 @@ static const struct bpf_sec_def section_defs[] = {
 	SEC_DEF("cgroup/dev",		CGROUP_DEVICE, BPF_CGROUP_DEVICE, SEC_ATTACHABLE_OPT),
 	SEC_DEF("struct_ops+",		STRUCT_OPS, 0, SEC_NONE),
 	SEC_DEF("sk_lookup",		SK_LOOKUP, BPF_SK_LOOKUP, SEC_ATTACHABLE),
+	// sch_bpf always has the well-formed `sch_bpf/`,
+	// since there are two kinds of sub-program,
+	// that is, enqueue and dequeue
+	SEC_DEF("sch_bpf/",		SCHED_QDISC, 0, SEC_NONE),
 };
 
 static size_t custom_sec_def_cnt;
@@ -12202,7 +12206,6 @@ int bpf_object__open_skeleton(struct bpf_object_skeleton *s,
 	);
 	struct bpf_object *obj;
 	int err;
-
 	/* Attempt to preserve opts->object_name, unless overriden by user
 	 * explicitly. Overwriting object name for skeletons is discouraged,
 	 * as it breaks global data maps, because they contain object name

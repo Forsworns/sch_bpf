@@ -16,6 +16,9 @@ LINUX_REPO=${2-""}
 BPF_BRANCH=${3-""}
 BASELINE_COMMIT=${BPF_NEXT_BASELINE:-$(cat ${LIBBPF_REPO}/CHECKPOINT-COMMIT)}
 BPF_BASELINE_COMMIT=${BPF_BASELINE:-$(cat ${LIBBPF_REPO}/BPF-CHECKPOINT-COMMIT)}
+BPF_BASELINE_COMMIT=a482783b662a4de88ba6e18ff6eb72063bd402fe
+BASELINE_COMMIT=1f235777c3a4ab115162fe7d45b82be534b9ae2e
+echo "????? ${BPF_BASELINE_COMMIT}"
 
 if [ -z "${LIBBPF_REPO}" ] || [ -z "${LINUX_REPO}" ]; then
 	echo "Error: libbpf or linux repos are not specified"
@@ -193,6 +196,7 @@ echo "Dumping existing libbpf commit signatures..."
 for h in $(git log --pretty='%h' -n500); do
 	echo $h "$(commit_signature $h)" >> ${TMP_DIR}/libbpf_commits.txt
 done
+echo "Dumping done"
 
 # Use current kernel repo HEAD as a source of patches
 cd_to ${LINUX_REPO}
@@ -206,6 +210,10 @@ BPF_BASELINE_TAG=libbpf-bpf-baseline-${SUFFIX}
 BPF_TIP_TAG=libbpf-bpf-tip-${SUFFIX}
 VIEW_TAG=libbpf-view-${SUFFIX}
 LIBBPF_SYNC_TAG=libbpf-sync-${SUFFIX}
+
+echo "BASELINE_COMMIT ${BASELINE_COMMIT}"
+echo "LINUX_ABS_DIR ${LINUX_ABS_DIR}" 
+
 
 # Squash state of kernel repo at baseline into single commit
 SQUASH_BASE_TAG=libbpf-squash-base-${SUFFIX}
