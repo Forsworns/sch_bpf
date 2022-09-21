@@ -22,21 +22,24 @@ struct bpf_skb_map {
 	struct rb_root root;
 	raw_spinlock_t lock;
 	struct rb_node node;
-	u64 rank;
+	u32 rank;
 	struct list_head list;
 	atomic_t count;
 };
 
 struct skb_map_cb {
-	struct qdisc_skb_cb qdisc_cb;
-	u64 rank;
+	struct qdisc_skb_cb data_end;
+	u32 rank;
+	// in case overlapping two void* inside the bpf_skb_data_end,
+	// there is a 4 bytes space due to 8-byte-alignment in the bpf_skb_data_end,
+	// we use this 4 bytes to save rank value
 };
 
 static struct skb_map_cb *skb_map_cb(const struct sk_buff *skb)
 {
         struct skb_map_cb *cb = (struct skb_map_cb *)skb->cb;
 
-        BUILD_BUG_ON(sizeof(*cb) > sizeof_field(struct sk_buff, cb));
+		BUILD_BUG_ON(sizeof(*cb) > sizeof_field(struct sk_buff, cb));
         return cb;
 }
 
@@ -106,7 +109,7 @@ static void skb_map_free(struct bpf_map *map)
 	bpf_map_area_free(rb);
 }
 
-static struct sk_buff *skb_rb_find(struct rb_root *root, u64 rank)
+static struct sk_buff *skb_rb_find(struct rb_root *root, u32 rank)
 {
 	struct rb_node **p = &root->rb_node;
 	struct rb_node *parent = NULL;
@@ -135,7 +138,7 @@ static void *skb_map_lookup_elem_sys(struct bpf_map *map, void *key)
 static void *skb_map_lookup_elem(struct bpf_map *map, void *key)
 {
 	struct bpf_skb_map *rb = bpf_skb_map(map);
-	u64 rank = *(u64 *) key;
+	u32 rank = *(u32 *) key;
 
 	return skb_rb_find(&rb->root, rank);
 }
@@ -151,7 +154,7 @@ static int skb_map_update_elem(struct bpf_map *map, void *key, void *value,
 static int skb_map_delete_elem(struct bpf_map *map, void *key)
 {
 	struct bpf_skb_map *rb = bpf_skb_map(map);
-	u64 rank = *(u64 *) key;
+	u32 rank = *(u32 *) key;
 	struct sk_buff *skb;
 
 	skb = skb_rb_find(&rb->root, rank);
@@ -167,7 +170,7 @@ static int skb_map_get_next_key(struct bpf_map *map, void *key, void *next_key)
 {
 	struct bpf_skb_map *rb = bpf_skb_map(map);
 	struct sk_buff *skb;
-	u64 rank;
+	u32 rank;
 
 	if (!key) {
 		skb = skb_rb_first(&rb->root);
@@ -175,7 +178,7 @@ static int skb_map_get_next_key(struct bpf_map *map, void *key, void *next_key)
 			return -ENOENT;
 		goto found;
 	}
-	rank = *(u64 *) key;
+	rank = *(u32 *) key;
 	skb = skb_rb_find(&rb->root, rank);
 	if (!skb)
 		return -ENOENT;
@@ -183,7 +186,7 @@ static int skb_map_get_next_key(struct bpf_map *map, void *key, void *next_key)
 	if (!skb)
 		return 0;
 found:
-	*(u64 *) next_key = skb_map_cb(skb)->rank;
+	*(u32 *) next_key = skb_map_cb(skb)->rank;
 	return 0;
 }
 
@@ -194,7 +197,7 @@ static int bpf_for_each_skb_map(struct bpf_map *map, bpf_callback_t callback_fn,
 	struct sk_buff *skb, *tmp;
 	u32 num_elems = 0;
 	u64 ret = 0;
-	u64 key;
+	u32 key;
 
 	if (flags != 0)
 		return -EINVAL;
@@ -246,7 +249,7 @@ static void skb_rb_push(struct rb_root *root, struct sk_buff *skb)
 	rb_insert_color(&skb->rbnode, root);
 }
 
-BPF_CALL_2(bpf_skb_map_pop, struct bpf_map *, map, u64, key)
+BPF_CALL_2(bpf_skb_map_pop, struct bpf_map *, map, u32, key)
 {
 	struct bpf_skb_map *rb = bpf_skb_map(map);
 	struct sk_buff *skb;
@@ -273,7 +276,7 @@ const struct bpf_func_proto bpf_skb_map_pop_proto = {
 	.arg2_type	= ARG_ANYTHING,
 };
 
-BPF_CALL_3(bpf_skb_map_push, struct bpf_map *, map, struct sk_buff *, skb, u64, key)
+BPF_CALL_3(bpf_skb_map_push, struct bpf_map *, map, struct sk_buff *, skb, u32, key)
 {
 	struct bpf_skb_map *rb = bpf_skb_map(map);
 	unsigned long flags;
@@ -293,7 +296,7 @@ const struct bpf_func_proto bpf_skb_map_push_proto = {
 	.gpl_only	= false,
 	.ret_type	= RET_INTEGER,
 	.arg1_type	= ARG_CONST_MAP_PTR,
-	.arg2_type	= ARG_PTR_TO_CTX,
+	.arg2_type	= ARG_ANYTHING,
 	.arg3_type	= ARG_ANYTHING,
 };
 
@@ -339,7 +342,7 @@ static void flow_map_free(struct bpf_map *map)
 	bpf_map_area_free(rb);
 }
 
-static struct bpf_map *map_rb_find(struct rb_root *root, u64 rank)
+static struct bpf_map *map_rb_find(struct rb_root *root, u32 rank)
 {
 	struct rb_node **p = &root->rb_node;
 	struct rb_node *parent = NULL;
@@ -362,7 +365,7 @@ static struct bpf_map *map_rb_find(struct rb_root *root, u64 rank)
 static void *flow_map_lookup_elem(struct bpf_map *map, void *key)
 {
 	struct bpf_skb_map *rb = bpf_skb_map(map);
-	u64 rank = *(u64 *) key;
+	u32 rank = *(u32 *) key;
 
 	return map_rb_find(&rb->root, rank);
 }
@@ -372,7 +375,7 @@ static int flow_map_delete_elem(struct bpf_map *map, void *key)
 {
 	struct bpf_skb_map *rb = bpf_skb_map(map);
 	struct bpf_skb_map *node;
-	u64 rank = *(u64 *) key;
+	u32 rank = *(u32 *) key;
 	struct bpf_map *target;
 
 	target = map_rb_find(&rb->root, rank);
@@ -408,7 +411,7 @@ const struct bpf_map_ops flow_map_ops = {
 	.map_btf_id = &skb_map_btf_ids[0],
 };
 
-BPF_CALL_2(bpf_flow_map_pop, struct bpf_map *, map, u64, key)
+BPF_CALL_2(bpf_flow_map_pop, struct bpf_map *, map, u32, key)
 {
 	struct bpf_skb_map *rb = bpf_skb_map(map);
 	struct bpf_map *target;
@@ -453,7 +456,7 @@ static void map_rb_push(struct rb_root *root, struct bpf_map *map)
 	rb_insert_color(&smap->node, root);
 }
 
-BPF_CALL_3(bpf_flow_map_push, struct bpf_map *, map, struct bpf_map *, value, u64, key)
+BPF_CALL_3(bpf_flow_map_push, struct bpf_map *, map, struct bpf_map *, value, u32, key)
 {
 	struct bpf_skb_map *rb = bpf_skb_map(map);
 	unsigned long irq_flags;
