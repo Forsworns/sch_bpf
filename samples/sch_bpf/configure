@@ -1,0 +1,163 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0
+# This is not an autoconf generated configure
+
+INCLUDE="$PWD/include"
+PREFIX="/usr"
+LIBDIR="\${prefix}/lib"
+LIBBPF_DIR="/"
+
+# Output file which is input to Makefile
+CONFIG=config.mk
+
+# Make a temp directory in build tree.
+TMPDIR=$(mktemp -d config.XXXXXX)
+trap 'status=$?; rm -rf $TMPDIR; exit $status' EXIT HUP INT QUIT TERM
+
+check_toolchain()
+{
+    : ${PKG_CONFIG:=pkg-config}
+    : ${AR=ar}
+    : ${CC=gcc}
+
+    echo "PKG_CONFIG:=${PKG_CONFIG}" >>$CONFIG
+    echo "AR:=${AR}" >>$CONFIG
+    echo "CC:=${CC}" >>$CONFIG
+    # for gdb breakpoints
+    echo 'CFLAGS += -g' >>$CONFIG
+}
+
+check_lib_dir()
+{
+	LIBDIR=$(echo $LIBDIR | sed "s|\${prefix}|$PREFIX|")
+
+	echo -n "lib directory: "
+	echo "$LIBDIR"
+	echo "LIBDIR:=$LIBDIR" >>$CONFIG
+}
+
+have_libbpf_basic()
+{
+    cat >$TMPDIR/libbpf_test.c <<EOF
+#include <bpf/libbpf.h>
+int main(int argc, char **argv) {
+    bpf_program__set_autoload(NULL, false);
+    bpf_map__ifindex(NULL);
+    bpf_map__set_pin_path(NULL, NULL);
+    bpf_object__open_file(NULL, NULL);
+    return 0;
+}
+EOF
+
+    $CC -o $TMPDIR/libbpf_test $TMPDIR/libbpf_test.c $LIBBPF_CFLAGS $LIBBPF_LDLIBS >/dev/null 2>&1
+    local ret=$?
+
+    rm -f $TMPDIR/libbpf_test.c $TMPDIR/libbpf_test
+    return $ret
+}
+
+check_libbpf()
+{
+    if [ $(uname -m) = x86_64 ]; then
+        local LIBBPF_LIBDIR="${LIBBPF_DIR}/usr/lib64"
+    else
+        local LIBBPF_LIBDIR="${LIBBPF_DIR}/usr/lib"
+    fi
+
+    if [ -n "$LIBBPF_DIR" ]; then
+        LIBBPF_CFLAGS="-I${LIBBPF_DIR}/usr/include"
+        LIBBPF_LDLIBS="${LIBBPF_LIBDIR}/libbpf.a -lz -lelf"
+        LIBBPF_VERSION=$(PKG_CONFIG_LIBDIR=${LIBBPF_LIBDIR}/pkgconfig ${PKG_CONFIG} libbpf --modversion)
+    else
+        LIBBPF_CFLAGS=$(${PKG_CONFIG} libbpf --cflags)
+        LIBBPF_LDLIBS=$(${PKG_CONFIG} libbpf --libs)
+        LIBBPF_VERSION=$(${PKG_CONFIG} libbpf --modversion)
+    fi
+
+    if ! have_libbpf_basic; then
+        echo "no"
+        echo "	libbpf version $LIBBPF_VERSION is too low, please update it to at least 0.1.0"
+        return
+    else
+        echo "HAVE_LIBBPF:=y" >>$CONFIG
+        echo 'LDLIBS += ' $LIBBPF_LDLIBS >>$CONFIG
+    fi
+
+    echo "yes"
+    echo "	libbpf version $LIBBPF_VERSION"
+}
+
+check_mnl()
+{
+	if ${PKG_CONFIG} libmnl --exists; then
+		echo "HAVE_MNL:=y" >>$CONFIG
+		echo "yes"
+		echo 'LDLIBS +=' `${PKG_CONFIG} libmnl --libs` >>$CONFIG
+	else
+		echo "no"
+	fi
+}
+
+
+usage()
+{
+	cat <<EOF
+Usage: $0 [OPTIONS]
+	--include_dir <dir>		Path to include dir
+	--libdir <dir>			Path to lib dir
+	--libbpf_dir <dir>		Path to libbpf DESTDIR
+	--prefix <dir>			Path prefix of the lib files to install
+	-h | --help			Show this usage info
+EOF
+	exit $1
+}
+
+# Compat with the old INCLUDE path setting method.
+if [ $# -eq 1 ] && [ "$(echo $1 | cut -c 1)" != '-' ]; then
+	INCLUDE="$1"
+else
+	while [ "$#" -gt 0 ]; do
+		case "$1" in
+			--include_dir)
+				shift
+				INCLUDE="$1" ;;
+			--include_dir=*)
+				INCLUDE="${1#*=}" ;;
+			--libdir)
+				shift
+				LIBDIR="$1" ;;
+			--libdir=*)
+				LIBDIR="${1#*=}" ;;
+			--libbpf_dir)
+				shift
+				LIBBPF_DIR="$1" ;;
+			--libbpf_dir=*)
+				LIBBPF_DIR="${1#*=}" ;;
+			--prefix)
+				shift
+				PREFIX="$1" ;;
+			--prefix=*)
+				PREFIX="${1#*=}" ;;
+			-h | --help)
+				usage 0 ;;
+			--*)
+				;;
+			*)
+				usage 1 ;;
+		esac
+		[ "$#" -gt 0 ] && shift
+	done
+fi
+
+echo "# Generated config based on" $INCLUDE >$CONFIG
+
+check_toolchain
+
+echo
+check_lib_dir
+
+echo -n "libbpf support: "
+check_libbpf
+
+echo -n "libmnl support: "
+check_mnl
