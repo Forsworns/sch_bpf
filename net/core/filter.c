@@ -8737,6 +8737,20 @@ static bool tc_cls_act_is_valid_access(int off, int size,
 	return bpf_skb_is_valid_access(off, size, type, prog, info);
 }
 
+static int tc_qdisc_prologue(struct bpf_insn *insn_buf, bool direct_write,
+			       const struct bpf_prog *prog)
+{
+	return bpf_unclone_prologue(insn_buf, direct_write, prog, SCH_BPF_DROP);
+}
+
+static bool tc_qdisc_is_valid_access(int off, int size,
+				       enum bpf_access_type type,
+				       const struct bpf_prog *prog,
+				       struct bpf_insn_access_aux *info)
+{
+	return true;
+}
+
 static bool __is_valid_xdp_access(int off, int size)
 {
 	if (off < 0 || off >= sizeof(struct xdp_md))
@@ -9799,6 +9813,49 @@ static u32 tc_cls_act_convert_ctx_access(enum bpf_access_type type,
 	return insn - insn_buf;
 }
 
+static u32 tc_qdisc_convert_ctx_access(enum bpf_access_type type,
+				  const struct bpf_insn *si,
+				  struct bpf_insn *insn_buf,
+				  struct bpf_prog *prog, u32 *target_size)
+{
+	struct bpf_insn *insn = insn_buf;
+
+	switch (si->off) {
+	case offsetof(struct sch_bpf_ctx, skb):
+		if (type == BPF_WRITE)
+			*insn++ = BPF_STX_MEM(BPF_FIELD_SIZEOF(struct sch_bpf_ctx, skb),
+				      si->dst_reg, si->src_reg,
+				      offsetof(struct sch_bpf_ctx, skb));
+		else
+			*insn++ = BPF_LDX_MEM(BPF_FIELD_SIZEOF(struct sch_bpf_ctx, skb),
+				      si->dst_reg, si->src_reg,
+				      offsetof(struct sch_bpf_ctx, skb));
+		break;
+	case offsetof(struct sch_bpf_ctx, classid):
+		if (type == BPF_WRITE)
+			*insn++ = BPF_STX_MEM(BPF_FIELD_SIZEOF(struct sch_bpf_ctx, classid),
+				      si->dst_reg, si->src_reg,
+				      offsetof(struct sch_bpf_ctx, classid));
+		else
+			*insn++ = BPF_LDX_MEM(BPF_FIELD_SIZEOF(struct sch_bpf_ctx, classid),
+				      si->dst_reg, si->src_reg,
+				      offsetof(struct sch_bpf_ctx, classid));
+		break;
+	case offsetof(struct sch_bpf_ctx, delay):
+		if (type == BPF_WRITE)
+			*insn++ = BPF_STX_MEM(BPF_FIELD_SIZEOF(struct sch_bpf_ctx, delay),
+				      si->dst_reg, si->src_reg,
+				      offsetof(struct sch_bpf_ctx, delay));
+		else
+			*insn++ = BPF_LDX_MEM(BPF_FIELD_SIZEOF(struct sch_bpf_ctx, delay),
+				      si->dst_reg, si->src_reg,
+				      offsetof(struct sch_bpf_ctx, delay));
+		break;
+	}
+
+	return insn - insn_buf;
+}
+
 static u32 xdp_convert_ctx_access(enum bpf_access_type type,
 				  const struct bpf_insn *si,
 				  struct bpf_insn *insn_buf,
@@ -10698,9 +10755,9 @@ const struct bpf_prog_ops tc_cls_act_prog_ops = {
 
 const struct bpf_verifier_ops tc_qdisc_verifier_ops = {
 	.get_func_proto		= tc_qdisc_func_proto,
-	.is_valid_access	= tc_cls_act_is_valid_access,
-	.convert_ctx_access	= tc_cls_act_convert_ctx_access,
-	.gen_prologue		= tc_cls_act_prologue,
+	.is_valid_access	= tc_qdisc_is_valid_access,
+	.convert_ctx_access	= tc_qdisc_convert_ctx_access,
+	.gen_prologue		= tc_qdisc_prologue,
 	.gen_ld_abs		= bpf_gen_ld_abs,
 };
 
